@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Project-internal (not for public repo)
+AGENTS.md
+
+# 根目录勿提交模板副本（正式副本在 examples/）
+/pipeline_template.xlsx
+
+# Linter cache
+.ruff_cache/
+
+# Generated model outputs
+*_report/
+
+# Notebook outputs
+notebooks/output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ipynb_checkpoints/
+.ipynb_checkpoints/
+
+# Linter cache
+.ruff_cache/
+
+# Generated model outputs
+*_report/
+
+# Notebook outputs
+notebooks/output/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
