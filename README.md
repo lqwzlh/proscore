@@ -41,7 +41,7 @@ from proscore.transform import WOETransformer
 # ... 按需组合
 ```
 
-详见 [docs/使用指南/](docs/使用指南/index.md) 各模块手册。
+详见 [使用指南](https://github.com/lqwzlh/proscore/tree/main/docs/%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97) 各模块手册。
 
 ### B. 链式 API
 
@@ -89,7 +89,7 @@ proscore run my_project/pipeline_template.xlsx --output-script run.py
 
 模板含 7 个 Sheet（Global / Data / Steps / Binning / Screening / Modeling / Variables），每个参数带中文说明、可选范围和默认值。留空 = 使用默认值。无 OOT 时最少只需填 `data_file`、`target`、`time_col` 3 个格子；有 OOT 时再补充时间切分参数。
 
-详细参数说明见 [docs/使用指南/pipeline-config.md](docs/使用指南/pipeline-config.md)
+详细参数说明见 [pipeline-config.md](https://github.com/lqwzlh/proscore/blob/main/docs/%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97/pipeline-config.md)
 
 ---
 

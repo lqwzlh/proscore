@@ -12,7 +12,7 @@ from proscore.modeling import ScoreCard
 from proscore.selection import Filter, StepwiseSelector, assess_screen
 from proscore.transform import WOETransformer
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 class ProScore:
