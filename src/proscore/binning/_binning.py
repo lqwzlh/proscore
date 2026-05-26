@@ -80,6 +80,14 @@ class Binning:
     adjust_shape : bool
         When True (default), enforce monotonicity / UV-shape detection and
         merge undersized bins.
+    missing_combine : str or None, optional
+        Strategy for merging a small or zero-bad missing bin into a normal bin:
+        ``None`` / ``False`` = keep missing as its own bin (default);
+        ``True`` = not supported (use ``"near"`` or ``"worst"``);
+        ``"near"`` = merge into the normal bin with the closest bad rate;
+        ``"worst"`` = merge into the normal bin with the highest bad rate.
+        Merging is triggered when the missing bin has zero bads *or* its
+        sample count falls below ``min_bin_pct`` of total rows.
     min_nobs : int or float, default 30
         Minimum number of non-null observations required to attempt binning.
         Columns with fewer non-null values are skipped (``_fit_one`` returns
@@ -100,6 +108,7 @@ class Binning:
         skip_values: dict | None = None,
         manual_cutoffs: dict | None = None,
         adjust_shape: bool = True,
+        missing_combine: str | None = None,
         max_categories: int = 20,
         min_nobs: int | float = 30,
         **kwargs,
@@ -132,6 +141,21 @@ class Binning:
                 "Not yet implemented."
             )
 
+        if isinstance(missing_combine, bool):
+            if missing_combine:
+                raise ValueError(
+                    "missing_combine=True is not supported. "
+                    "Use 'near' or 'worst' instead."
+                )
+            else:  # False → keep missing (same as None)
+                missing_combine = None
+
+        if missing_combine is not None and missing_combine not in ("near", "worst"):
+            raise ValueError(
+                f"Unknown missing_combine: {missing_combine!r}. "
+                f"Valid options: {None}, 'near', 'worst'."
+            )
+
         if min_nobs < 0:
             raise ValueError("min_nobs must be non-negative")
 
@@ -146,6 +170,7 @@ class Binning:
         self.skip_values = skip_values or {}
         self.manual_cutoffs = manual_cutoffs or {}
         self.adjust_shape = adjust_shape
+        self.missing_combine = missing_combine
         self.max_categories = max_categories
         self.min_nobs = min_nobs
 
@@ -290,6 +315,40 @@ class Binning:
                     bin_label="missing",
                 )
             )
+
+        # --- merge small / zero-bad missing bin into a normal bin ---
+        if bt.has_missing and self.missing_combine and len(bt.bins) > 1:
+            missing_bin = bt.bins[-1]
+            min_samples = max(1, int(total_n * self.min_bin_pct))
+            if missing_bin.count_bad == 0 or missing_bin.count < min_samples:
+                normal_bins = bt.bins[:-1]
+                if self.missing_combine == "worst":
+                    target_idx = max(
+                        range(len(normal_bins)),
+                        key=lambda i: normal_bins[i].bad_rate,
+                    )
+                else:  # "near"
+                    missing_br = missing_bin.bad_rate
+                    target_idx = min(
+                        range(len(normal_bins)),
+                        key=lambda i: (
+                            abs(normal_bins[i].bad_rate - missing_br)
+                            if normal_bins[i].count > 0
+                            else float("inf")
+                        ),
+                    )
+                # Merge counts into target bin
+                tgt = bt.bins[target_idx]
+                tgt.count += missing_bin.count
+                tgt.count_bad += missing_bin.count_bad
+                tgt.count_good += missing_bin.count_good
+                tgt.bad_rate = (
+                    tgt.count_bad / tgt.count if tgt.count > 0 else 0.0
+                )
+                # Remove missing bin
+                bt.bins.pop()
+                bt.has_missing = False
+                bt.missing_merged = True
 
         # --- final WOE / IV for all bins ---
         _recalc_woe_iv(bt)

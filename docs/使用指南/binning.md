@@ -188,6 +188,7 @@ class Binning(
 | `skip_values` | `dict` | `None` | 排除值列表，`{列名: [值列表]}`。这些值在分箱前直接丢弃 |
 | `manual_cutoffs` | `dict` | `None` | 专家指定切点，`{列名: [切点列表]}`。指定后跳过算法分箱与趋势调整，仅做趋势检测 |
 | `adjust_shape` | `bool` | `True` | 是否执行趋势调整与箱占比/WOE 差检查。设为 `False` 时仅用算法切点，不做任何合并 |
+| `missing_combine` | `str` 或 `None` | `None` | 缺失箱合并策略：`None`/`False`=不合并（默认）；`"near"`=合并到坏账率最接近的箱；`"worst"`=合并到坏账率最高的箱。触发条件：缺失箱全为好样本，或样本数低于 `min_bin_pct` |
 | `max_categories` | `int` | `20` | 分类变量判定阈值 |
 
 ### 分箱算法
@@ -354,7 +355,7 @@ class BinTable:
     dtype: str                 # "continuous" 或 "categorical"
     special_values: list       # 特殊值列表
     has_missing: bool          # 是否有缺失箱
-    missing_merged: bool       # 缺失箱是否曾合并；当前实现恒 False（预留）
+    missing_merged: bool       # 缺失箱是否曾被合并（missing_combine 触发后为 True）
     cat_mapping: dict          # 分类变量：{原始值 → 箱号}
 ```
 

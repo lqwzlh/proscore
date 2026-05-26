@@ -112,6 +112,58 @@ class TestBinning:
         b.fit(sample_df[["x1", "target"]], y="target")
         assert "x1" in b.bin_table_
 
+    # ── missing_combine ────────────────────────────────────────────────────
+
+    def test_missing_combine_near(self, sample_df):
+        """x4 has ~2.5% NaN → below min_bin_pct=0.05 → merged."""
+        b = Binning(method="chi", n_bins=5, min_bin_pct=0.05, missing_combine="near")
+        b.fit(sample_df[["x4", "target"]], y="target")
+        bt = b.bin_table_["x4"]
+        assert bt.missing_merged, "small missing bin should be merged"
+        assert not bt.has_missing, "after merge, has_missing should be False"
+        assert bt.iv_total >= 0
+
+    def test_missing_combine_worst(self, sample_df):
+        b = Binning(method="chi", n_bins=5, min_bin_pct=0.05, missing_combine="worst")
+        b.fit(sample_df[["x4", "target"]], y="target")
+        bt = b.bin_table_["x4"]
+        assert bt.missing_merged
+
+    def test_missing_combine_default_keeps_missing(self, sample_df):
+        """Without missing_combine, missing values stay as their own bin."""
+        b = Binning(method="chi", n_bins=5, min_bin_pct=0.05)
+        b.fit(sample_df[["x4", "target"]], y="target")
+        bt = b.bin_table_["x4"]
+        assert bt.has_missing
+        assert not bt.missing_merged
+
+    def test_missing_combine_large_missing_kept(self):
+        """当缺失占比 >= min_bin_pct 且缺失箱有好有坏时，保留缺失箱。"""
+        rng = np.random.default_rng(42)
+        n = 200
+        df = pd.DataFrame({
+            "x": np.concatenate([rng.normal(0, 1, 180), [np.nan] * 20]),  # 10% missing
+            "y": np.concatenate([rng.binomial(1, 0.3, 180), [1, 0] * 10]),  # missing has both
+        })
+        b = Binning(method="chi", n_bins=4, min_bin_pct=0.05, missing_combine="near")
+        b.fit(df[["x", "y"]], y="y")
+        bt = b.bin_table_["x"]
+        assert bt.has_missing, "10% missing with both bad/good should be kept"
+        assert not bt.missing_merged
+
+    @pytest.mark.parametrize("invalid", [True, "", "unknown"])
+    def test_missing_combine_invalid_values(self, invalid):
+        with pytest.raises(ValueError):
+            Binning(missing_combine=invalid)
+
+    def test_missing_combine_false_is_none(self, sample_df):
+        """False is accepted as alias for None (backward compat)."""
+        b = Binning(method="chi", n_bins=5, min_bin_pct=0.05, missing_combine=False)
+        b.fit(sample_df[["x4", "target"]], y="target")
+        bt = b.bin_table_["x4"]
+        assert bt.has_missing
+        assert not bt.missing_merged
+
 
 class TestBinningProcess:
     def test_fit_with_feature_config(self, full_df, features):

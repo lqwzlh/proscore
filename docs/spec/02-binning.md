@@ -25,7 +25,7 @@
 - **最小箱占比** `min_bin_pct=0.05`：低于阈值的箱自动合并
 - **最小WOE差距** `min_woe_diff=0.1`：WOE差距小于阈值的邻箱合并
 - **特殊值处理**：支持指定特殊值单独成箱，不参与分箱算法
-- **缺失值处理**：缺失默认单独成箱；文档中“小占比缺失箱合并到 badrate 相近箱”的**自动合并规则当前未实现**，`BinTable.missing_merged` 字段预留，当前恒为 `False`
+- **缺失值处理**：缺失默认单独成箱。`missing_combine=”near”` 或 `”worst”` 可在缺失箱全为好样本或占比低于 `min_bin_pct` 时自动合并到相邻箱，合并后 `BinTable.missing_merged=True`
 
 ### F4：分类变量处理
 - **按值WOE** `categorical_mode='woe_per_value'`：每个取值独立一箱计算WOE
@@ -75,7 +75,7 @@ class BinTable:
     dtype: str               # continuous | categorical
     special_values: list
     has_missing: bool
-    missing_merged: bool     # 预留：缺失箱是否曾合并（当前实现恒 False）
+    missing_merged: bool     # 缺失箱是否曾被合并（missing_combine 触发后为 True）
     cat_mapping: dict        # 分类：原始值 → bin_no（WOE 映射由 WOETransformer 消费）
 ```
 
@@ -95,6 +95,7 @@ class Binning:
                  skip_values: dict | None = None,     # {var: [vals]}
                  manual_cutoffs: dict | None = None,  # {var: [cutoffs]}
                  adjust_shape: bool = True,
+                 missing_combine: str | None = None,  # None/'near'/'worst'
                  **kwargs)
 
     def fit(self, X: pd.DataFrame, y: str | pd.Series) -> 'Binning':

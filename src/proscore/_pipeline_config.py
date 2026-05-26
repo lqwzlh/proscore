@@ -64,6 +64,8 @@ _PARAM_SPEC = {
                     "单箱最小样本占比"),
     "adjust_shape": ("on", ["on", "off"], "str",
                      "是否自动调整分箱趋势（推荐 on）"),
+    "missing_combine": ("none", ["none", "near", "worst"], "str",
+                        "缺失箱合并策略：none=不合并 / near=合并到坏账率最接近的箱 / worst=合并到坏账率最高的箱"),
 
     # ── screening ────────────────────────────────────────────────────────────
     "max_missing_rate": (0.8, None, "float", 0.1, 0.95,
@@ -701,6 +703,10 @@ class PipelineConfig:
                 kw[key] = cfg[key]
         if cfg.get("adjust_shape") is not None:
             kw["adjust_shape"] = cfg["adjust_shape"] == "on" if isinstance(cfg["adjust_shape"], str) else bool(cfg["adjust_shape"])
+        # Excel "none" → Python None
+        mc = cfg.get("missing_combine")
+        if mc is not None and str(mc).strip().lower() != "none":
+            kw["missing_combine"] = str(mc).strip()
         return kw
 
     def _build_refine_kw(self) -> dict[str, Any]:
@@ -1021,7 +1027,8 @@ def generate_template(out_dir: str = ".") -> str:
 
         # ── Binning ─────────────────────────────────────────────────────────
         _write_params_sheet(writer, "Binning",
-                            ["method", "n_bins", "min_bin_pct", "adjust_shape"])
+                            ["method", "n_bins", "min_bin_pct", "adjust_shape",
+                             "missing_combine"])
 
         # ── Screening ───────────────────────────────────────────────────────
         _write_params_sheet(writer, "Screening",

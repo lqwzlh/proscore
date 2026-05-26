@@ -155,6 +155,7 @@ proscore run my_project/pipeline_template.xlsx
 | `n_bins` | 5 | 3–10 | 目标分箱数 |
 | `min_bin_pct` | 0.05 | 0.01–0.20 | 单箱最小样本占比 |
 | `adjust_shape` | on | on / off | 是否自动调整趋势（推荐 on） |
+| `missing_combine` | none | none / near / worst | 缺失箱合并策略。none=不合并；near=合并到坏账率最接近的箱；worst=合并到坏账率最高的箱 |
 
 > 逐变量的 `monotonic` 和 `special_values` 在 Variables Sheet 中设置。
 
