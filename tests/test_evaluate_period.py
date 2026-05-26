@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
 from proscore.evaluate import evaluate_by_period
 
@@ -14,7 +13,7 @@ class TestEvaluateByPeriod:
         from proscore.selection import StepwiseSelector
         from proscore.transform import WOETransformer
 
-        train, test, _ = (
+        train, _test, _ = (
             full_df[full_df["apply_date"].dt.year <= 2021],
             full_df[full_df["apply_date"].dt.year == 2022],
             full_df[full_df["apply_date"].dt.year == 2023],

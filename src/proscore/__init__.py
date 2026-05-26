@@ -5,7 +5,10 @@ from __future__ import annotations
 import pandas as pd
 
 from proscore import inspect
-from proscore._pipeline_config import PipelineConfig, run_pipeline
+from proscore._pipeline_config import (
+    PipelineConfig,  # noqa: F401
+    run_pipeline,  # noqa: F401
+)
 from proscore.binning import Binning, BinningProcess
 from proscore.evaluate import evaluate as _evaluate
 from proscore.modeling import ScoreCard
@@ -231,6 +234,7 @@ class ProScore:
         features = self._numeric_after_prefilter()
         if len(features) == 0:
             import warnings
+
             from proscore.selection._screen import FeatureScreenWarning
 
             warnings.warn(
@@ -425,6 +429,7 @@ class ProScore:
 
 def _warn_halted(ps: ProScore) -> None:
     import warnings
+
     from proscore.selection._screen import FeatureScreenWarning
 
     warnings.warn(

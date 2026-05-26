@@ -7,9 +7,8 @@ available for accurate PSI / IV calculation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
 import warnings
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -23,7 +22,7 @@ from proscore.utils import is_categorical
 from proscore.utils._psi import psi_from_distributions
 
 if TYPE_CHECKING:
-    from proscore.binning._base import BinTable
+    pass
 
 
 class Filter:

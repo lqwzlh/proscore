@@ -5,7 +5,6 @@ from __future__ import annotations
 import pandas as pd
 
 from proscore.report import ReportBuilder
-from proscore.selection import Filter
 
 
 def test_overview_uses_run_summary():
@@ -53,7 +52,12 @@ def test_embed_images_uses_data_uri(tmp_path):
     rb = ReportBuilder(plot_dir="plots")
     rb._report_dir = str(tmp_path)
     rb._embed_images = True
-    rb._bin_tables = {"x": type("BT", (), {"bins": [], "iv_total": 0, "monotonic": 0, "trend_match": True, "method": "chi"})()}
+    rb._bin_tables = {
+        "x": type(
+            "BT", (),
+            {"bins": [], "iv_total": 0, "monotonic": 0, "trend_match": True, "method": "chi"},
+        )()
+    }
     from proscore.report._builder import _html_image
 
     html = _html_image(str(tmp_path), "plots", "t.png", embed=True, alt="图")

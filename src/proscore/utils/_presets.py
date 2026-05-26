@@ -18,7 +18,7 @@ An optional second sheet ``"dimensions"`` (free text) is ignored at runtime.
 from __future__ import annotations
 
 import warnings
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import pandas as pd
 

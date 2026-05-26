@@ -8,16 +8,15 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from proscore.binning._adjust import monotonicity_check, trend_adjust, uv_check
 from proscore.binning._base import BinRecord, BinTable
 from proscore.binning._categorical import badrate_merge, freq_merge, woe_per_value
 from proscore.binning._chi import chi_binning
 from proscore.binning._distance import distance_binning
 from proscore.binning._frequency import frequency_binning
 from proscore.binning._tree import tree_binning
-from proscore.binning._adjust import monotonicity_check, trend_adjust, uv_check
 from proscore.binning._woe import calc_iv_woe, normalize_woe
 from proscore.utils import is_categorical, require_unique_column_labels
-
 
 _VALID_METHODS = frozenset({"chi", "frequency", "distance", "tree", "optimal"})
 

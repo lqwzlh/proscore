@@ -140,7 +140,6 @@ class TestBinning:
     def test_missing_combine_large_missing_kept(self):
         """当缺失占比 >= min_bin_pct 且缺失箱有好有坏时，保留缺失箱。"""
         rng = np.random.default_rng(42)
-        n = 200
         df = pd.DataFrame({
             "x": np.concatenate([rng.normal(0, 1, 180), [np.nan] * 20]),  # 10% missing
             "y": np.concatenate([rng.binomial(1, 0.3, 180), [1, 0] * 10]),  # missing has both

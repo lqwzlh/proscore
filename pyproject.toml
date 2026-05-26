@@ -75,7 +75,8 @@ addopts = "-v --tb=short"
 
 [tool.ruff]
 target-version = "py39"
-line-length = 100
+line-length = 120
+exclude = ["notebooks/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]

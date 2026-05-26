@@ -14,7 +14,6 @@ from sklearn.metrics import roc_auc_score
 
 from proscore.utils._psi import psi_from_distributions
 
-
 # ── default alert rules ───────────────────────────────────────────────────
 
 _DEFAULT_RULES: list[dict] = [
@@ -371,7 +370,8 @@ class ModelMonitor:
                 result[col] = float(psi_val)
         if skipped:
             warnings.warn(
-                f"Feature PSI skipped {len(skipped)} features not in baseline: {skipped[:10]}{'...' if len(skipped) > 10 else ''}",
+                f"Feature PSI skipped {len(skipped)} features not in baseline: "
+                f"{skipped[:10]}{'...' if len(skipped) > 10 else ''}",
                 stacklevel=2,
             )
         return result

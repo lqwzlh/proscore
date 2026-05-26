@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -199,7 +198,10 @@ class TestImportSmoke:
 
     def test_viz_imports(self):
         from proscore.viz import (  # noqa: F401
-            plot_ks, plot_roc, plot_binning, plot_score_distribution,
+            plot_binning,
+            plot_ks,
+            plot_roc,
+            plot_score_distribution,
         )
 
     def test_monitor_imports(self):

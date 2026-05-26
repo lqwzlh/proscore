@@ -20,7 +20,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-
 # ── constants ────────────────────────────────────────────────────────────────
 
 _DEFAULT_GLOBAL = {
@@ -93,7 +92,8 @@ _PARAM_SPEC = {
     "pvalue_threshold": (0.05, None, "float", 0.01, 0.20,
                          "逐步回归 P 值阈值"),
     "coef_sign": ("positive", ["positive", "negative", ""],
-                  "str", "系数符号约束。positive=所有变量系数>0，保证WOE方向与风险一致（推荐）。negative=所有<0。空=不限"),
+                  "str", "系数符号约束。positive=所有变量系数>0，保证WOE方向与风险一致"
+                  "（推荐）。negative=所有<0。空=不限"),
     "force_fill": ("on", ["on", "off"], "str",
                    "变量不足 n_min 时是否强制补齐"),
     "perturbation": ("on", ["on", "off"], "str",
@@ -500,7 +500,6 @@ class PipelineConfig:
 
         fpath = self.data_cfg["data_file"]
         time_col = self.data_cfg.get("time_col")
-        target = self.data_cfg["target"]
         id_col = self.data_cfg.get("id_col")
         train_ratio = float(self.data_cfg.get("train_ratio", 0.7))
 
@@ -624,7 +623,6 @@ class PipelineConfig:
 
         if preset_fc or feature_belong or force_in:
             # Use BinningProcess for per-variable config
-            from proscore.binning import BinningProcess  # noqa: F811
             binning_kw.pop("feature_config", None)
             if preset_fc:
                 binning_kw["feature_config"] = preset_fc
@@ -702,7 +700,8 @@ class PipelineConfig:
             if key in cfg:
                 kw[key] = cfg[key]
         if cfg.get("adjust_shape") is not None:
-            kw["adjust_shape"] = cfg["adjust_shape"] == "on" if isinstance(cfg["adjust_shape"], str) else bool(cfg["adjust_shape"])
+            adj = cfg["adjust_shape"]
+            kw["adjust_shape"] = adj == "on" if isinstance(adj, str) else bool(adj)
         # Excel "none" → Python None
         mc = cfg.get("missing_combine")
         if mc is not None and str(mc).strip().lower() != "none":
@@ -820,12 +819,12 @@ class PipelineConfig:
                 _w("oot = df[oot_mask].drop(columns=[" + repr(time_col) + "]).reset_index(drop=True)")
             _w(f"dev_pool = dev_pool.drop(columns=[{time_col!r}])")
             _w("")
-            _w(f"idx = np.random.permutation(len(dev_pool))")
+            _w("idx = np.random.permutation(len(dev_pool))")
             _w(f"n_train = int(len(dev_pool) * {train_ratio})")
             _w("train = dev_pool.iloc[idx[:n_train]].reset_index(drop=True)")
             _w("test  = dev_pool.iloc[idx[n_train:]].reset_index(drop=True)")
         else:
-            _w(f"idx = np.random.permutation(len(df))")
+            _w("idx = np.random.permutation(len(df))")
             _w(f"n_train = int(len(df) * {train_ratio})")
             _w("train = df.iloc[idx[:n_train]].reset_index(drop=True)")
             _w("test  = df.iloc[idx[n_train:]].reset_index(drop=True)")
@@ -858,15 +857,15 @@ class PipelineConfig:
             _w("# ── 分箱（含变量预设：单调趋势 / 特殊值）──")
             _w("from proscore.binning import BinningProcess")
             _w(f"feature_config = {repr(preset_fc)}")
-            _w(f"bp = BinningProcess(")
-            _w(f"    feature_config=feature_config,")
+            _w("bp = BinningProcess(")
+            _w("    feature_config=feature_config,")
             _w(f"    default_method={bk.get('method', 'chi')!r},")
             _w(f"    default_n_bins={bk.get('n_bins', 5)},")
             extra_bk = {k: v for k, v in bk.items() if k not in ("method", "n_bins")}
             if extra_bk:
                 _w(f"    {_fmt_kw(extra_bk)},")
-            _w(f")")
-            _w(f"bp.fit(train, y=target)")
+            _w(")")
+            _w("bp.fit(train, y=target)")
         else:
             _w(f"p.bin({_fmt_kw(bk)})")
         # refine must come after bin (IV/PSI/AUC depend on binning)

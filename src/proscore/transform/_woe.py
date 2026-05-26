@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from proscore.binning._base import BinTable
-
 
 _UNSEEN_STRATEGIES = frozenset({"worst", "most_common", "missing", "zero"})
 

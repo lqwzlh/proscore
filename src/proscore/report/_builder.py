@@ -122,7 +122,6 @@ class ReportBuilder:
             rb.with_evaluate(ps.eval_result)
             # Auto-extract plot data from ProScore when available
             try:
-                import statsmodels.api as sm
                 support = ps.selector_.support_ if ps.selector_ else []
                 if support and ps.transformer_ and ps.scorecard_:
                     trn_w = ps.transformer_.transform(ps.train_df[support])
@@ -388,7 +387,6 @@ class ReportBuilder:
         with open(md_src, encoding="utf-8") as f:
             md_text = f.read()
         html_body = _markdown_to_html(md_text)
-        report_dir = os.path.dirname(os.path.abspath(path)) or "."
         html = _HTML_TEMPLATE.format(body=html_body)
         with open(path, "w", encoding="utf-8") as f:
             f.write(html)
@@ -454,7 +452,7 @@ class ReportBuilder:
         ]
         if self.purpose:
             lines += ["", f"> {self.purpose}"]
-        return "\n".join(l for l in lines if l)
+        return "\n".join(ln for ln in lines if ln)
 
     def _render_overview(self) -> str:
         lines = ["---", "", "## 0. 建模概览", ""]
@@ -497,7 +495,9 @@ class ReportBuilder:
             f"| OOT 样本量 | {n_oot if n_oot is not None else '—'} |",
             f"| 训练坏账率 | {train_br} |",
             f"| 分箱方法 | {bin_method} |",
-            f"| 入模变量 / 建模池 / 初始候选 | {n_final} / {n_pool if n_pool is not None else '?'} / {n_cand if n_cand is not None else '?'} |",
+            f"| 入模变量 / 建模池 / 初始候选 "
+            f"| {n_final} / {n_pool if n_pool is not None else '?'} "
+            f"/ {n_cand if n_cand is not None else '?'} |",
             f"| Train KS / AUC | {trn_ks} / {trn_auc} |",
             f"| Test KS / AUC | {tst_ks} / {tst_auc} |",
             f"| 分数 PSI | {psi} |",
@@ -654,8 +654,8 @@ class ReportBuilder:
     @staticmethod
     def _filter_dropped_rows(qf: pd.DataFrame) -> pd.DataFrame:
         if "dropped" in qf.columns:
-            return qf[qf["dropped"] == True]
-        return qf[qf["selected"] == False]
+            return qf[qf["dropped"]]
+        return qf[~qf["selected"]]
 
     def _render_filter_stage(
         self,
@@ -804,8 +804,10 @@ class ReportBuilder:
             "",
             "| 指标 | 训练集 | 测试集 | 衰退 |",
             "|------|--------|--------|------|",
-            f"| KS | {ev.get('trn_ks',0):.4f} | {ev.get('test_ks',0):.4f} | {ev.get('ks_reduce',0):.4f} |",
-            f"| AUC | {ev.get('trn_auc',0):.4f} | {ev.get('test_auc',0):.4f} | {ev.get('trn_auc',0)-ev.get('test_auc',0):.4f} |",
+            f"| KS | {ev.get('trn_ks',0):.4f} | {ev.get('test_ks',0):.4f} "
+            f"| {ev.get('ks_reduce',0):.4f} |",
+            f"| AUC | {ev.get('trn_auc',0):.4f} | {ev.get('test_auc',0):.4f} "
+            f"| {ev.get('trn_auc',0)-ev.get('test_auc',0):.4f} |",
             f"| Acc | {ev.get('trn_acc',0):.4f} | {ev.get('test_acc',0):.4f} | — |",
             f"| PSI | — | {ev.get('psi',0):.4f} | — |",
             f"| KS 相对衰退 | — | — | {ev.get('ks_rel_gap',0):.4f} |",

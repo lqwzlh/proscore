@@ -57,13 +57,13 @@ def plot_binning(bt: BinTable, figsize: tuple[float, float] = (9, 4)):
     fig, ax1 = plt.subplots(figsize=figsize)
 
     x = np.arange(len(labels))
-    bars = ax1.bar(x, counts, color="steelblue", alpha=0.7, label="Count")
+    ax1.bar(x, counts, color="steelblue", alpha=0.7, label="Count")
     ax1.set_ylabel("Count", color="steelblue")
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels, rotation=30, ha="right", fontsize=8)
 
     ax2 = ax1.twinx()
-    line = ax2.plot(x, bad_rates, "o-", color="darkorange", linewidth=2, label="Bad rate")
+    ax2.plot(x, bad_rates, "o-", color="darkorange", linewidth=2, label="Bad rate")
     ax2.set_ylabel("Bad rate", color="darkorange")
 
     # WOE annotation
