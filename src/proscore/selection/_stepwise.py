@@ -473,9 +473,9 @@ class StepwiseSelector:
         """Pairwise correlation check."""
         if self.corr_threshold is None or len(vars) < 2:
             return True
-        corr = X[vars].corr().abs()
-        np.fill_diagonal(corr.values, 0)
-        return (corr > self.corr_threshold).sum().sum() == 0
+        corr_arr = X[vars].corr().abs().values.copy()
+        np.fill_diagonal(corr_arr, 0)
+        return (corr_arr > self.corr_threshold).sum() == 0
 
     def _check_belong(self, vars: list[str]) -> bool:
         """Source-belong coverage check."""

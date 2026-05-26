@@ -333,7 +333,8 @@ class Filter:
         if len(num_feats) < 2:
             return []
         corr_mat = X[num_feats].replace([np.inf, -np.inf], np.nan).corr().abs()
-        np.fill_diagonal(corr_mat.values, 0)
+        vals = corr_mat.values.copy()
+        np.fill_diagonal(vals, 0)
         out: set[str] = set()
         for i in range(len(num_feats)):
             for j in range(i + 1, len(num_feats)):
