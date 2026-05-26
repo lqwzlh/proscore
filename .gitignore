@@ -16,6 +16,10 @@ AGENTS.md
 # Notebook outputs
 notebooks/output/
 
+# Local benchmark vs external reference library (not published)
+scripts/run_benchmark_alignment.py
+docs/benchmark/
+
 # Python
 __pycache__/
 *.pyc
@@ -25,16 +29,6 @@ dist/
 build/
 .pytest_cache/
 .ipynb_checkpoints/
-.ipynb_checkpoints/
-
-# Linter cache
-.ruff_cache/
-
-# Generated model outputs
-*_report/
-
-# Notebook outputs
-notebooks/output/
 
 # IDE
 .idea/

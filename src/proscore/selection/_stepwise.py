@@ -45,6 +45,7 @@ class StepwiseSelector:
         n_min: int = 5,
         n_max: int = 15,
         force_fill: bool = True,
+        random_state: int | None = None,
     ) -> None:
         """Initialise the selector.
 
@@ -75,6 +76,10 @@ class StepwiseSelector:
             n_min: Minimum number of variables in a valid solution.
             n_max: Maximum number of variables in a valid solution.
             force_fill: When ``True``, pad up to *n_min* after iteration.
+            random_state: Seed for the random number generator used in
+                perturbation. When ``None`` (default), uses the global
+                ``numpy.random`` state. Set to an integer for reproducible
+                results.
         """
         self.pvalue_threshold = pvalue_threshold
         self.coef_sign = coef_sign
@@ -94,6 +99,7 @@ class StepwiseSelector:
         self.n_min = n_min
         self.n_max = n_max
         self.force_fill = force_fill
+        self._rng = np.random.RandomState(random_state) if random_state is not None else np.random
 
         self._support: list[str] = []
         self._record: dict[int, dict[str, Any]] = {}
@@ -518,7 +524,7 @@ class StepwiseSelector:
         if not self.perturbation or len(current) < 3:
             return current
         n_remove = max(1, int(len(current) * self.perturbation_pct))
-        keep = np.random.choice(
+        keep = self._rng.choice(
             current, size=len(current) - n_remove, replace=False
         ).tolist()
 
@@ -526,7 +532,7 @@ class StepwiseSelector:
         remaining = [f for f in all_feats if f not in keep]
         if remaining and self.perturbation_add > 0:
             n_add = min(self.perturbation_add, len(remaining))
-            additions = np.random.choice(remaining, size=n_add, replace=False).tolist()
+            additions = self._rng.choice(remaining, size=n_add, replace=False).tolist()
             keep.extend(additions)
         return keep
 

@@ -34,9 +34,12 @@
 - **自定义映射** `categorical_mode='custom'`：接口保留，当前在 `Binning.__init__` 中抛出 `NotImplementedError`
 
 ### F5：可选MIP分箱
-- 当 `method='optimal'` 且已安装 `optbinning` 时启用
-- 原生支持单调性约束、最大/最小箱数
-- 若无 optbinning，报错提示安装
+
+> **状态：计划中，尚未实现。** 当前使用 `method='optimal'` 会抛出 `NotImplementedError`。
+
+- optbinning 分箱（`method='optimal'`）为计划功能，尚未实现
+- 当前调用 `Binning(method='optimal')` 会直接抛出 `NotImplementedError`
+- 计划支持：原生单调性约束、最大/最小箱数
 
 ### F6：批量处理
 - `BinningProcess` 类支持一次性批量处理 DataFrame 所有特征
