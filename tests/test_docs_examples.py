@@ -55,7 +55,7 @@ class TestReadmeChainAPI:
             .bin(method="chi", n_bins=5)
             .refine(iv_range=(0.02, None))
             .transform()
-            .select(method="stepwise")
+            .select()
             .fit(odds=20, pdo=20, base_score=600)
             .scorecard()
             .evaluate()
@@ -80,7 +80,7 @@ class TestReadmeChainAPI:
             .bin(method="chi", n_bins=5)
             .refine(iv_range=(0.02, None))
             .transform()
-            .select(method="stepwise")
+            .select()
             .fit(odds=20, pdo=20, base_score=600)
             .scorecard()
             .evaluate()
@@ -96,7 +96,7 @@ class TestReadmeExcelFlow:
     """README 'C. Excel 配置驱动' code block — template + run flow."""
 
     def test_template_creates_valid_file(self, tmp_path):
-        """proscore template → generates .xlsx with all 7 sheets."""
+        """proscore template → generates .xlsx with all 8 sheets."""
         result = subprocess.run(
             [sys.executable, "-m", "proscore", "template", str(tmp_path)],
             capture_output=True, text=True, timeout=30,
@@ -109,8 +109,11 @@ class TestReadmeExcelFlow:
 
         sheets = pd.ExcelFile(xlsx, engine="openpyxl").sheet_names
         for name in ("Global", "Data", "Steps", "Binning", "Screening",
-                     "Modeling", "Variables"):
+                     "Modeling", "Rules", "Variables"):
             assert name in sheets, f"Missing sheet: {name}"
+        steps = pd.read_excel(xlsx, sheet_name="Steps", engine="openpyxl")
+        mine_row = steps.loc[steps["参数名"] == "mine_rules", "默认值"]
+        assert len(mine_row) == 1 and str(mine_row.iloc[0]).strip().lower() == "off"
 
     def test_filled_template_runs(self, tmp_path):
         """Fill the template with test_data.csv and run."""

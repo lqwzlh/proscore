@@ -57,8 +57,9 @@ p = (
     .prefilter()
     .bin(method="chi", n_bins=5)
     .refine(iv_range=(0.02, None))
+    .mine_rules(method="exhaustive", min_lift=3.0)  # 可选：规则挖掘
     .transform()
-    .select(method="stepwise")
+    .select()
     .fit(odds=20, pdo=20, base_score=600)
     .scorecard()
     .evaluate()  # 自动汇报 train / test / oot 三列指标
@@ -87,7 +88,7 @@ proscore run my_project/pipeline_template.xlsx
 proscore run my_project/pipeline_template.xlsx --output-script run.py
 ```
 
-模板含 7 个 Sheet（Global / Data / Steps / Binning / Screening / Modeling / Variables），每个参数带中文说明、可选范围和默认值。留空 = 使用默认值。无 OOT 时最少只需填 `data_file`、`target`、`time_col` 3 个格子；有 OOT 时再补充时间切分参数。
+模板含 8 个 Sheet（Global / Data / Steps / Binning / Screening / Modeling / Rules / Variables），每个参数带中文说明、可选范围和默认值。留空 = 使用默认值。无 OOT 时最少只需填 `data_file`、`target`、`time_col` 3 个格子；有 OOT 时再补充时间切分参数。
 
 详细参数说明见 [pipeline-config.md](https://github.com/lqwzlh/proscore/blob/main/docs/%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97/pipeline-config.md)
 

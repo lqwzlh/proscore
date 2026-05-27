@@ -1,6 +1,6 @@
 """Excel-driven pipeline configuration and execution.
 
-Read a 7-sheet Excel workbook and produce a ProScore chain, then execute the
+Read an 8-sheet Excel workbook and produce a ProScore chain, then execute the
 full modelling pipeline and save the report / monitor baseline.
 
 Usage (via CLI)::
@@ -46,6 +46,7 @@ _DEFAULT_STEPS = {
     "quality": "on",
     "prefilter": "on",
     "refine": "on",
+    "mine_rules": "off",
     "select": "on",
     "evaluate": "on",
     "report": "on",
@@ -104,6 +105,26 @@ _PARAM_SPEC = {
             "odds 翻倍时增加的分数"),
     "base_score": (600, None, "int", 400, 800,
                    "基准 odds 对应的分数"),
+
+    # ── rules (mine_rules) ───────────────────────────────────────────────────
+    "rm_method": ("exhaustive", ["exhaustive", "tree", "apriori"],
+                  "str", "规则搜索方法", "rules"),
+    "rm_max_depth": (3, None, "int", 1, 3,
+                     "最多变量交叉深度（exhaustive/apriori）", "rules"),
+    "rm_max_tree_depth": (4, None, "int", 2, 8,
+                          "决策树最大深度（tree 模式）", "rules"),
+    "rm_min_lift": (3.0, None, "float", 1.0, 10.0,
+                    "最小 Lift（precision / 整体坏账率）", "rules"),
+    "rm_min_hit_rate": (0.02, None, "float", 0.001, 0.5,
+                        "最小命中率（覆盖样本占比）", "rules"),
+    "rm_max_hit_rate": (0.20, None, "float", 0.01, 0.8,
+                        "最大命中率（避免过度拒绝）", "rules"),
+    "rm_max_rules": (15, None, "int", 1, 100,
+                     "最多输出规则条数", "rules"),
+    "rm_random_state": (42, None, "int", 0, 2**31-1,
+                        "随机种子（tree 模式可复现）", "rules"),
+    "rm_export_csv": ("on", ["on", "off"], "str",
+                      "是否导出 rules_table.csv", "rules"),
 }
 
 
@@ -127,6 +148,7 @@ class PipelineConfig:
     binning_cfg: dict[str, Any] = field(default_factory=dict)
     screening_cfg: dict[str, Any] = field(default_factory=dict)
     modeling_cfg: dict[str, Any] = field(default_factory=dict)
+    rules_cfg: dict[str, Any] = field(default_factory=dict)
     variable_presets: dict[str, Any] | None = None
     presets_path: str = ""
     _errors: list[ValidationError] = field(default_factory=list)
@@ -157,6 +179,7 @@ class PipelineConfig:
         cfg._parse_params(sheets.get("Binning"), "binning")
         cfg._parse_params(sheets.get("Screening"), "screening")
         cfg._parse_params(sheets.get("Modeling"), "modeling")
+        cfg._parse_params(sheets.get("Rules"), "rules")
         cfg._parse_variables(sheets.get("Variables"))
 
         if cfg._errors:
@@ -266,10 +289,14 @@ class PipelineConfig:
             self._errors.append(ValidationError(
                 "Steps", "select",
                 "select=on 需要 refine=on 提供候选变量。请打开 refine 或关闭 select。"))
+        if self.steps.get("mine_rules") and not self.steps.get("refine"):
+            self._errors.append(ValidationError(
+                "Steps", "mine_rules",
+                "mine_rules=on 需要 refine=on 提供候选变量。请打开 refine 或关闭 mine_rules。"))
 
     def _parse_params(self, df: pd.DataFrame | None, section: str) -> None:
         target = {"binning": self.binning_cfg, "screening": self.screening_cfg,
-                  "modeling": self.modeling_cfg}[section]
+                  "modeling": self.modeling_cfg, "rules": self.rules_cfg}[section]
 
         # Fill defaults
         for key, spec in _PARAM_SPEC.items():
@@ -282,12 +309,35 @@ class PipelineConfig:
                 if key in ("n_min", "n_max", "pvalue_threshold", "coef_sign",
                            "force_fill", "perturbation", "odds", "pdo", "base_score"):
                     target[key] = spec[0]
+            elif section == "rules" and stage == "rules":
+                target[key.removeprefix("rm_")] = spec[0]
 
         if df is None:
             return
 
         for _, row in df.iterrows():
             key = str(row.get("参数名", "")).strip()
+
+            # ── Rules section: bare Excel keys → rm_ prefixed _PARAM_SPEC keys ──
+            if section == "rules":
+                valid = ("method", "max_depth", "max_tree_depth",
+                         "min_lift", "min_hit_rate", "max_hit_rate",
+                         "max_rules", "random_state", "export_csv")
+                # Accept both bare keys and legacy rm_ prefixed keys
+                bare_key = key.removeprefix("rm_")
+                if bare_key not in valid:
+                    continue
+                spec_key = f"rm_{bare_key}"
+                if spec_key not in _PARAM_SPEC:
+                    continue
+                spec = _PARAM_SPEC[spec_key]
+                default_val = spec[0]
+                raw = _cell(row, "您的取值", default_val)
+                parsed = self._validate_param(section, bare_key, raw, spec)
+                if parsed is not None:
+                    target[bare_key] = parsed
+                continue
+
             if key not in _PARAM_SPEC:
                 continue
 
@@ -613,6 +663,7 @@ class PipelineConfig:
         prefilter_kw = self._build_prefilter_kw()
         binning_kw = self._build_binning_kw()
         refine_kw = self._build_refine_kw()
+        rules_kw = self._build_rules_kw()
         select_kw = self._build_select_kw()
         model_kw = self._build_model_kw()
 
@@ -646,6 +697,9 @@ class PipelineConfig:
         if self.steps.get("refine", True):
             p.refine(**refine_kw)
 
+        if self.steps.get("mine_rules", False):
+            p.mine_rules(**rules_kw)
+
         p.transform()
 
         if self.steps.get("select", True):
@@ -662,6 +716,19 @@ class PipelineConfig:
         # Report
         project_name = str(self.global_cfg.get("project_name", "scorecard"))
         output_dir = f"{project_name}_report"
+
+        # Rules table CSV (if mine_rules was run and export enabled)
+        if self.steps.get("mine_rules", False):
+            export = self.rules_cfg.get("export_csv", "on")
+            if str(export).strip().lower() != "off":
+                try:
+                    (Path(output_dir) / "rules_table.csv").parent.mkdir(parents=True, exist_ok=True)
+                    if p.rules_table_ is not None and len(p.rules_table_) > 0:
+                        p.rules_table_.to_csv(f"{output_dir}/rules_table.csv", index=False, encoding="utf-8-sig")
+                        result["rules_table_path"] = f"{output_dir}/rules_table.csv"
+                except Exception as e:
+                    warnings.warn(f"规则表导出失败: {e}", stacklevel=2)
+
         if self.steps.get("report", True):
             try:
                 from proscore.report import ReportBuilder
@@ -745,6 +812,15 @@ class PipelineConfig:
                 kw[key] = cfg[key]
         return kw
 
+    def _build_rules_kw(self) -> dict[str, Any]:
+        kw: dict[str, Any] = {}
+        cfg = self.rules_cfg
+        for key in ("method", "max_depth", "max_tree_depth", "min_lift",
+                     "min_hit_rate", "max_hit_rate", "max_rules", "random_state"):
+            if key in cfg:
+                kw[key] = cfg[key]
+        return kw
+
     def _print_summary(self, p) -> None:
         """Print a concise summary to stdout."""
         print(f"\n{'='*60}")
@@ -752,6 +828,12 @@ class PipelineConfig:
         print(f"{'='*60}")
         try:
             print(f"  入模变量: {' | '.join(p.support_)}")
+        except Exception:
+            pass
+        try:
+            rt = getattr(p, "rules_table_", None)
+            if rt is not None and len(rt) > 0:
+                print(f"  挖掘规则: {len(rt)} 条 (Top Lift={rt.iloc[0]['lift']:.2f})")
         except Exception:
             pass
         er = getattr(p, "eval_result", None) or {}
@@ -872,6 +954,11 @@ class PipelineConfig:
         if self.steps.get("refine", True):
             rk = self._build_refine_kw()
             _w(f"p.refine({_fmt_kw(rk)})")
+
+        if self.steps.get("mine_rules", False):
+            rk = self._build_rules_kw()
+            _w(f"p.mine_rules({_fmt_kw(rk)})")
+
         _w("p.transform()")
 
         # select
@@ -1040,6 +1127,12 @@ def generate_template(out_dir: str = ".") -> str:
                             ["n_min", "n_max", "pvalue_threshold", "coef_sign",
                              "force_fill", "perturbation", "odds", "pdo", "base_score"])
 
+        # ── Rules ───────────────────────────────────────────────────────────
+        _write_params_sheet(writer, "Rules",
+                            ["method", "max_depth", "max_tree_depth", "min_lift", "min_hit_rate",
+                             "max_hit_rate", "max_rules", "random_state", "export_csv"],
+                            section="rules")
+
         # ── Variables ───────────────────────────────────────────────────────
         var_examples = [
             ["income", "年收入", "还款能力", "decreasing", "-999", ""],
@@ -1073,6 +1166,7 @@ _STEP_DESC = {
     "quality": "IV/AUC/KS 排序（关了报告无排序表）",
     "prefilter": "粗筛：缺失率/单值率（关了全量进分箱）",
     "refine": "精筛：IV/AUC/PSI/VIF/相关性",
+    "mine_rules": "规则挖掘（Lift/Precision 规则，select 自动排除）",
     "select": "逐步回归（关了 refine 结果全部入模）",
     "evaluate": "模型评估：KS/AUC/PSI",
     "report": "生成 Markdown 报告",
@@ -1107,11 +1201,13 @@ _DATA_TYPES = {
 }
 
 
-def _write_params_sheet(writer, sheet_name: str, keys: list[str]) -> None:
+def _write_params_sheet(writer, sheet_name: str, keys: list[str],
+                        section: str = "") -> None:
     """Write a params sheet with unified columns."""
     rows = []
     for key in keys:
-        spec = _PARAM_SPEC[key]
+        lookup = f"rm_{key}" if section == "rules" else key
+        spec = _PARAM_SPEC[lookup]
         default = spec[0]
         choices = spec[1]
         ptype = spec[2]

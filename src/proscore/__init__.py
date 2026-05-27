@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 
 from proscore import inspect
@@ -9,9 +11,11 @@ from proscore._pipeline_config import (
     PipelineConfig,  # noqa: F401
     run_pipeline,  # noqa: F401
 )
+from proscore._spec import PipelineSpec
 from proscore.binning import Binning, BinningProcess
 from proscore.evaluate import evaluate as _evaluate
 from proscore.modeling import ScoreCard
+from proscore.rules import RuleMiner
 from proscore.selection import Filter, StepwiseSelector, assess_screen
 from proscore.transform import WOETransformer
 
@@ -30,8 +34,9 @@ class ProScore:
           .prefilter(max_corr=0.75, max_vif=10) \\
           .bin(method="chi", n_bins=5) \\
           .refine(iv_range=(0.02, None), max_psi=0.25) \\
+          .mine_rules(...)   # optional: mine decision rules from raw features \\
           .transform() \\
-          .select(method="stepwise") \\
+          .select() \\
           .fit(odds=50, pdo=10) \\
           .scorecard() \\
           .evaluate()
@@ -58,8 +63,18 @@ class ProScore:
         self._halt_message: str = ""
         self._refine_skipped: bool = False
         self._screen_outcomes: list = []
+        self._spec: PipelineSpec | None = None
+        self._rulemine: RuleMiner | None = None
+        self._rule_features: list[str] = []
 
     # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _merge_kw(self, section: str, **explicit) -> dict:
+        """Merge explicit kwargs with PipelineSpec defaults (explicit wins)."""
+        if self._spec is None:
+            return explicit
+        spec_kw = getattr(self._spec, section, {})
+        return {**spec_kw, **explicit}
 
     def _train_X(self, features: list[str]) -> pd.DataFrame:
         return self.train_df[features]
@@ -121,6 +136,16 @@ class ProScore:
         """Columns for WOE / stepwise — refine survivors + categoricals."""
         return self._current_numeric() + self._categorical_features()
 
+    # ── spec injection ────────────────────────────────────────────────────────
+
+    def apply(self, spec: PipelineSpec) -> ProScore:
+        """Apply a :class:`PipelineSpec` as default parameters for the pipeline.
+
+        Explicit kwargs on individual chain methods override spec defaults.
+        """
+        self._spec = spec
+        return self
+
     # ── read ──────────────────────────────────────────────────────────────────
 
     def read(
@@ -169,6 +194,7 @@ class ProScore:
         ``min_auc``, ``max_corr``, ``max_vif``.  Leave ``iv_range`` and
         ``max_psi`` unset (``None``) until :meth:`refine`.
         """
+        kwargs = self._merge_kw("prefilter", **kwargs)
         _check_read(self)
         features = self._initial_features()
         self._prefilter = Filter(**kwargs)
@@ -191,6 +217,9 @@ class ProScore:
     # ── bin (train — survivors of prefilter + categoricals) ───────────────────
 
     def bin(self, method: str = "chi", n_bins: int = 10, **kwargs) -> ProScore:
+        kwargs = self._merge_kw("binning", **kwargs)
+        method = kwargs.pop("method", method)
+        n_bins = kwargs.pop("n_bins", n_bins)
         _check_read(self)
         if self._halted:
             _warn_halted(self)
@@ -226,6 +255,7 @@ class ProScore:
         Pass ``iv_range``, ``max_psi`` (Train vs Test), etc.  Uses
         :attr:`Binning.bin_table_` from the preceding :meth:`bin` call.
         """
+        kwargs = self._merge_kw("refine", **kwargs)
         _check_read(self)
         if self._halted:
             _warn_halted(self)
@@ -287,14 +317,49 @@ class ProScore:
         self._transformer.fit(tables)
         return self
 
+    # ── mine_rules (optional — before transform / select) ────────────────────
+
+    def mine_rules(self, **kwargs) -> ProScore:
+        """Mine decision rules from refined candidates (before WOE transform).
+
+        Rules use raw feature values (not WOE).  Mined features are
+        automatically excluded from :meth:`select`.
+        """
+        kwargs = self._merge_kw("rules", **kwargs)
+        _check_read(self)
+        if self._binner is None:
+            raise RuntimeError("Call bin() before mine_rules().")
+        features = self._current_numeric()
+        if len(features) == 0:
+            warnings.warn("No numeric features available for rule mining.", stacklevel=2)
+            return self
+
+        self._rulemine = RuleMiner(**kwargs)
+        self._rulemine.fit(
+            X=self._train_X(features),
+            y=self._train_y(),
+            bin_table=self._binner.bin_table_,
+        )
+        self._rule_features = self._rulemine.used_features_
+
+        return self
+
     # ── select ────────────────────────────────────────────────────────────────
 
-    def select(self, method: str = "stepwise", **kwargs) -> ProScore:
+    def select(self, **kwargs) -> ProScore:
+        kwargs = self._merge_kw("select", **kwargs)
+        if kwargs.pop("method", None) is not None:
+            warnings.warn(
+                "select(method=...) is ignored; only stepwise selection is supported.",
+                UserWarning,
+                stacklevel=2,
+            )
         if self._halted:
             _warn_halted(self)
             return self
         _check_transformer(self)
-        features = self._features_for_modeling()
+        features = [c for c in self._features_for_modeling()
+                    if c not in self._rule_features]
         train_woe = self._transformer.transform(self._train_X(features))
         train_woe[self.target] = self._train_y().values
 
@@ -315,6 +380,10 @@ class ProScore:
     # ── fit / scorecard / evaluate ────────────────────────────────────────────
 
     def fit(self, odds: float = 50, pdo: float = 10, base_score: float = 600, **kwargs) -> ProScore:
+        kwargs = self._merge_kw("model", **kwargs)
+        odds = kwargs.pop("odds", odds)
+        pdo = kwargs.pop("pdo", pdo)
+        base_score = kwargs.pop("base_score", base_score)
         if self._halted:
             _warn_halted(self)
             return self
@@ -425,6 +494,18 @@ class ProScore:
     @property
     def screen_outcomes_(self) -> list:
         return list(self._screen_outcomes)
+
+    @property
+    def rulemine_(self) -> RuleMiner | None:
+        """The fitted :class:`RuleMiner` instance (or ``None``)."""
+        return self._rulemine
+
+    @property
+    def rules_table_(self):
+        """Mined rules evaluation table (or empty DataFrame)."""
+        if self._rulemine is None:
+            return pd.DataFrame()
+        return self._rulemine.rules_table_
 
 
 def _warn_halted(ps: ProScore) -> None:

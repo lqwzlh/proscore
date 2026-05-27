@@ -34,7 +34,7 @@ class TestChainAPI:
         assert len(p.filter_.support_) > 0
 
         p.transform(unseen_strategy="worst")
-        p.select(method="stepwise", n_min=3, n_max=8, force_fill=True, max_iter_round=6)
+        p.select( n_min=3, n_max=8, force_fill=True, max_iter_round=6)
         p.fit(odds=20, pdo=20, base_score=600)
         p.scorecard()
         p.evaluate()
@@ -49,7 +49,7 @@ class TestChainAPI:
         p.bin(method="chi", n_bins=5)
         p.refine(iv_range=(0.02, None), max_corr=0.9, max_vif=15)
         p.transform()
-        p.select(method="stepwise", n_min=3, n_max=8, force_fill=True, max_iter_round=6)
+        p.select( n_min=3, n_max=8, force_fill=True, max_iter_round=6)
         p.fit(odds=20, pdo=20, base_score=600)
         p.scorecard()
         p.evaluate()
@@ -66,7 +66,7 @@ class TestChainAPI:
         p.bin(method="chi", n_bins=5)
         p.refine(iv_range=(0.02, None), max_corr=0.9)
         p.transform()
-        p.select(method="stepwise", n_min=3, n_max=8, force_fill=True, max_iter_round=6)
+        p.select( n_min=3, n_max=8, force_fill=True, max_iter_round=6)
         p.fit(odds=20, pdo=20, base_score=600)
         p.scorecard()
         p.evaluate()

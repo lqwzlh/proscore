@@ -4,7 +4,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `pipeline_template.xlsx` | 7 个 Sheet（Global / Data / Steps / Binning / Screening / Modeling / Variables） |
+| `pipeline_template.xlsx` | 8 个 Sheet（Global / Data / Steps / Binning / Screening / Modeling / Rules / Variables） |
 
 ## 使用方式
 
