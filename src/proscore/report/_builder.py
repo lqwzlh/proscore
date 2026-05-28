@@ -69,6 +69,7 @@ class ReportBuilder:
         self._score_table: pd.DataFrame | None = None
 
         self._eval_result: dict[str, Any] = {}
+        self._diagnosis: Any = None
         self._oot_period_eval: pd.DataFrame | None = None
         self._stability_result: pd.DataFrame | None = None
         self._monitor: Any = None
@@ -129,6 +130,11 @@ class ReportBuilder:
                     rb.with_plot_data(train_scores=trn_score)
             except Exception:
                 pass
+            # Auto-attach diagnosis when available (or best-effort generate from eval_result)
+            if getattr(ps, "diagnosis_", None) and ps.diagnosis_.issues:
+                rb.with_diagnosis(ps.diagnosis_)
+            elif ps.eval_result:
+                rb.with_diagnosis()  # will generate a lightweight report from eval only
         return rb
 
     # ── data input methods ─────────────────────────────────────────────────
@@ -269,6 +275,19 @@ class ReportBuilder:
         self._eval_result = eval_result
         return self
 
+    def with_diagnosis(self, report=None) -> ReportBuilder:
+        """Attach a :class:`~proscore.evaluate.DiagnosisReport`.
+
+        Pass a report object directly, or ``None`` to have the builder
+        generate one from ``_eval_result`` (requires evaluate data).
+        """
+        if report is not None:
+            self._diagnosis = report
+        else:
+            from proscore.evaluate import diagnose
+            self._diagnosis = diagnose(self._eval_result)
+        return self
+
     def with_oot_period_eval(self, oot_period_df: pd.DataFrame) -> ReportBuilder:
         """Attach multi-period OOT metrics from :func:`evaluate_by_period`."""
         self._oot_period_eval = oot_period_df
@@ -320,6 +339,8 @@ class ReportBuilder:
 
         if self._eval_result:
             parts.append(self._render_evaluate())
+        if self._diagnosis and self._diagnosis.issues:
+            parts.append(self._render_diagnosis())
 
         parts.append(self._render_conclusions())
 
@@ -793,6 +814,21 @@ class ReportBuilder:
             lines.append(_md_table_safe(display))
             lines.append("")
 
+        return "\n".join(lines)
+
+    def _render_diagnosis(self) -> str:
+        """Render the diagnosis report as a Markdown section."""
+        lines = ["## 模型诊断", ""]
+        report = self._diagnosis
+        for level, label in [("critical", "严重"), ("warning", "警告"), ("info", "提示")]:
+            items = [i for i in report.issues if i.level == level]
+            if not items:
+                continue
+            lines.append(f"### {label}")
+            for item in items:
+                lines.append(f"- **{item.title}** — {item.evidence}")
+                lines.append(f"  → {item.suggestion}")
+            lines.append("")
         return "\n".join(lines)
 
     def _render_evaluate(self) -> str:

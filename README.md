@@ -69,6 +69,8 @@ p = (
 > `train` 必传，`test` 和 `oot` 可选。分箱/WOE 只在 train 上拟合；逐步回归用 test 监控过拟合；OOT 仅用于最终评估。
 >
 > 完整教程见 [notebooks/ProScore完整建模流程.ipynb](notebooks/ProScore完整建模流程.ipynb)
+>
+> **诊断增强**（v0.2+）：`.evaluate().diagnose()` 生成 4 层结构化健康报告（含根因变量），支持 `thresholds=...` 自定义阈值，适配不同机构/产品风控偏好。
 
 ### C. Excel 配置驱动
 
@@ -103,6 +105,7 @@ proscore run my_project/pipeline_template.xlsx --output-script run.py
 | 逐步回归   | 双向选择 + 五重约束（p值/符号/VIF/相关/来源） | 严谨的多重共线性控制与维度归属管理    |
 | 模型监控   | Score/Feature PSI + 规则引擎告警 + JSON 持久化 | 投产后持续验证，自动风险预警          |
 | 报告生成   | 7 章自动 Markdown 报告（含图表）              | 银保监合规文档一键生成                |
+| 模型诊断   | 4 层健康检查 + 根因定位 + 可自定义阈值        | 投产前自动风险识别，支持策略微调      |
 
 ### 设计原则
 

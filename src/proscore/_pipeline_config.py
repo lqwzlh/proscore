@@ -20,6 +20,46 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+
+def _train_test_from_dev_pool(
+    dev_pool: pd.DataFrame,
+    *,
+    target: str | None,
+    train_ratio: float,
+    random_state: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Stratified train/test split when *target* has ≥2 samples per class."""
+    if (
+        target
+        and target in dev_pool.columns
+        and len(dev_pool) > 1
+        and dev_pool[target].nunique() >= 2
+        and int(dev_pool[target].value_counts().min()) >= 2
+    ):
+        from sklearn.model_selection import train_test_split
+
+        tr, te = train_test_split(
+            dev_pool,
+            train_size=train_ratio,
+            stratify=dev_pool[target],
+            random_state=random_state,
+        )
+        return tr.reset_index(drop=True), te.reset_index(drop=True)
+
+    n = len(dev_pool)
+    rng = np.random.RandomState(random_state)
+    idx = rng.permutation(n)
+    split = int(n * train_ratio)
+    if n > 1:
+        split = max(1, min(n - 1, split))
+    else:
+        split = n
+    return (
+        dev_pool.iloc[idx[:split]].reset_index(drop=True),
+        dev_pool.iloc[idx[split:]].reset_index(drop=True),
+    )
+
+
 # ── constants ────────────────────────────────────────────────────────────────
 
 _DEFAULT_GLOBAL = {
@@ -99,6 +139,8 @@ _PARAM_SPEC = {
                    "变量不足 n_min 时是否强制补齐"),
     "perturbation": ("on", ["on", "off"], "str",
                      "是否启用扰动搜索"),
+    "max_iter_round": (100, None, "int", 2, 200,
+                       "逐步回归最大迭代轮数"),
     "odds": (20, None, "int", 10, 100,
              "基准好坏比（1:20 ≈ 坏账率 4.8%）"),
     "pdo": (20, None, "int", 10, 50,
@@ -307,7 +349,8 @@ class PipelineConfig:
                 target[key] = spec[0]
             elif section == "modeling" and (stage is None):
                 if key in ("n_min", "n_max", "pvalue_threshold", "coef_sign",
-                           "force_fill", "perturbation", "odds", "pdo", "base_score"):
+                           "force_fill", "perturbation", "max_iter_round",
+                           "odds", "pdo", "base_score"):
                     target[key] = spec[0]
             elif section == "rules" and stage == "rules":
                 target[key.removeprefix("rm_")] = spec[0]
@@ -351,7 +394,8 @@ class PipelineConfig:
                 continue
             if section == "modeling":
                 valid = ("n_min", "n_max", "pvalue_threshold", "coef_sign",
-                         "force_fill", "perturbation", "odds", "pdo", "base_score")
+                         "force_fill", "perturbation", "max_iter_round",
+                         "odds", "pdo", "base_score")
                 if key not in valid:
                     continue
 
@@ -546,12 +590,14 @@ class PipelineConfig:
 
     def _load_data(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None]:
         """Load and split data according to config."""
-        np.random.seed(int(self.global_cfg.get("random_seed", 42)))
+        seed = int(self.global_cfg.get("random_seed", 42))
+        np.random.seed(seed)
 
         fpath = self.data_cfg["data_file"]
         time_col = self.data_cfg.get("time_col")
         id_col = self.data_cfg.get("id_col")
         train_ratio = float(self.data_cfg.get("train_ratio", 0.7))
+        target = self.data_cfg.get("target")
 
         # Load
         if str(fpath).endswith((".xlsx", ".xls")):
@@ -602,12 +648,13 @@ class PipelineConfig:
             # Drop time_col from dev_pool
             dev_pool = dev_pool.drop(columns=[time_col], errors="ignore")
 
-        # Random split within dev pool
-        n = len(dev_pool)
-        idx = np.random.permutation(n)
-        split = int(n * train_ratio)
-        train = dev_pool.iloc[idx[:split]].reset_index(drop=True)
-        test = dev_pool.iloc[idx[split:]].reset_index(drop=True)
+        tgt = str(target).strip() if target else None
+        train, test = _train_test_from_dev_pool(
+            dev_pool,
+            target=tgt if tgt else None,
+            train_ratio=train_ratio,
+            random_state=seed,
+        )
         if oot is not None:
             oot = oot.reset_index(drop=True)
 
@@ -754,10 +801,19 @@ class PipelineConfig:
         return result
 
     def _build_prefilter_kw(self) -> dict[str, Any]:
-        kw: dict[str, Any] = {}
+        kw: dict[str, Any] = {
+            # 粗筛不做 IV/PSI（与链式 Notebook 常见写法一致；精筛在 refine）
+            "iv_range": None,
+            "max_psi": None,
+        }
+        cfg = self.screening_cfg
         for key in ("max_missing_rate", "max_one_value_rate"):
-            if key in self.screening_cfg:
-                kw[key] = self.screening_cfg[key]
+            if key in cfg:
+                kw[key] = cfg[key]
+        if cfg.get("max_corr") is not None:
+            kw["max_corr"] = float(cfg["max_corr"])
+        if cfg.get("max_vif") is not None:
+            kw["max_vif"] = float(cfg["max_vif"])
         return kw
 
     def _build_binning_kw(self) -> dict[str, Any]:
@@ -794,7 +850,7 @@ class PipelineConfig:
     def _build_select_kw(self) -> dict[str, Any]:
         kw: dict[str, Any] = {}
         cfg = self.modeling_cfg
-        for key in ("n_min", "n_max", "pvalue_threshold"):
+        for key in ("n_min", "n_max", "pvalue_threshold", "max_iter_round"):
             if key in cfg:
                 kw[key] = cfg[key]
         cs = cfg.get("coef_sign", "positive")
@@ -873,6 +929,7 @@ class PipelineConfig:
         _w("import numpy as np")
         _w("import pandas as pd")
         _w("import proscore as ps")
+        _w("from proscore._pipeline_config import _train_test_from_dev_pool")
         _w("")
         _w(f"np.random.seed({seed})")
         _w("")
@@ -890,6 +947,7 @@ class PipelineConfig:
             oot_start = self.data_cfg.get("oot_start")
             oot_end = self.data_cfg.get("oot_end")
             _w("dev_pool = df.copy()")
+            _w("oot = None")
             if dev_start:
                 _w(f"dev_pool = dev_pool[dev_pool[{time_col!r}] >= pd.Timestamp({str(dev_start)!r})]")
             if dev_end:
@@ -901,16 +959,16 @@ class PipelineConfig:
                 _w("oot = df[oot_mask].drop(columns=[" + repr(time_col) + "]).reset_index(drop=True)")
             _w(f"dev_pool = dev_pool.drop(columns=[{time_col!r}])")
             _w("")
-            _w("idx = np.random.permutation(len(dev_pool))")
-            _w(f"n_train = int(len(dev_pool) * {train_ratio})")
-            _w("train = dev_pool.iloc[idx[:n_train]].reset_index(drop=True)")
-            _w("test  = dev_pool.iloc[idx[n_train:]].reset_index(drop=True)")
         else:
-            _w("idx = np.random.permutation(len(df))")
-            _w(f"n_train = int(len(df) * {train_ratio})")
-            _w("train = df.iloc[idx[:n_train]].reset_index(drop=True)")
-            _w("test  = df.iloc[idx[n_train:]].reset_index(drop=True)")
+            _w("dev_pool = df.copy()")
             _w("oot = None")
+            _w("")
+
+        tgt_py = repr(str(target)) if (target and str(target).strip()) else "None"
+        _w(
+            f"train, test = _train_test_from_dev_pool(dev_pool, target={tgt_py}, "
+            f"train_ratio={float(train_ratio)}, random_state={int(seed)})"
+        )
 
         _w("")
         _w("# ── 建模流水线 ──")
@@ -1125,7 +1183,8 @@ def generate_template(out_dir: str = ".") -> str:
         # ── Modeling ────────────────────────────────────────────────────────
         _write_params_sheet(writer, "Modeling",
                             ["n_min", "n_max", "pvalue_threshold", "coef_sign",
-                             "force_fill", "perturbation", "odds", "pdo", "base_score"])
+                             "force_fill", "perturbation", "max_iter_round",
+                             "odds", "pdo", "base_score"])
 
         # ── Rules ───────────────────────────────────────────────────────────
         _write_params_sheet(writer, "Rules",

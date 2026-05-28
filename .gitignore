@@ -16,6 +16,12 @@ AGENTS.md
 # Notebook outputs
 notebooks/output/
 
+# Large public datasets (run scripts/download_real_data.py locally)
+data/gmsc_train.csv
+data/lending_club/
+data/home_credit/
+data/processed/
+
 # Local benchmark vs external reference library (not published)
 scripts/run_benchmark_alignment.py
 docs/benchmark/

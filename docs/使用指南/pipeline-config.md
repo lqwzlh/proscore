@@ -192,6 +192,7 @@ proscore run my_project/pipeline_template.xlsx
 | `coef_sign` | positive | positive / negative / 空 | 系数符号约束。positive=所有变量系数>0，保证 WOE 方向与风险一致（推荐）。negative=所有<0。空=不限 |
 | `force_fill` | on | on / off | 变量不足 n_min 时是否强制补齐 |
 | `perturbation` | on | on / off | 是否启用扰动搜索（卡住时随机增减变量） |
+| `max_iter_round` | 100 | 2–200 | 逐步回归最大迭代轮数（与链式 `select(max_iter_round=…)` 对应） |
 | `odds` | 20 | 10–100 | 基准好坏比（1:20 ≈ 坏账率 4.8%） |
 | `pdo` | 20 | 10–50 | odds 翻倍时增加的分数 |
 | `base_score` | 600 | 400–800 | 基准 odds 对应的分数 |

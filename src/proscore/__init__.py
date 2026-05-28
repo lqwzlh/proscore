@@ -19,7 +19,7 @@ from proscore.rules import RuleMiner
 from proscore.selection import Filter, StepwiseSelector, assess_screen
 from proscore.transform import WOETransformer
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 
 class ProScore:
@@ -425,6 +425,42 @@ class ProScore:
             features=features, n_bins=n_bins,
         )
         return self
+
+    def diagnose(self, *, print_report: bool = True, **kwargs) -> ProScore:
+        """Run model health diagnosis (post-evaluate) and optionally print a formatted report.
+
+        By default prints the human-readable report (for notebook / interactive use).
+        Set ``print_report=False`` to obtain the :class:`~proscore.evaluate.DiagnosisReport`
+        silently via the ``diagnosis_`` property.
+
+        Pass additional artefacts for deeper root-cause analysis, or override thresholds::
+
+            p.diagnose(
+                binning=p.binner_,
+                selector=p.selector_,
+                stability=stability_result,
+                period_eval=period_result,
+                thresholds={"discrimination": {"ks_critical": 0.18}},
+            )
+        """
+        from proscore.evaluate import diagnose as _diagnose
+
+        report = _diagnose(
+            self.eval_result,
+            binning=kwargs.pop("binning", self._binner),
+            selector=kwargs.pop("selector", self._selector),
+            y_train=self._train_y(),
+            **kwargs,
+        )
+        if print_report:
+            print(report)
+        self._diagnosis = report
+        return self
+
+    @property
+    def diagnosis_(self):
+        """The :class:`DiagnosisReport` from the last :meth:`diagnose` call."""
+        return getattr(self, "_diagnosis", None)
 
     # ── properties ────────────────────────────────────────────────────────────
 
