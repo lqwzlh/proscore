@@ -19,7 +19,7 @@ from proscore.rules import RuleMiner
 from proscore.selection import Filter, StepwiseSelector, assess_screen
 from proscore.transform import WOETransformer
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 
 class ProScore:
