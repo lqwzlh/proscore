@@ -37,7 +37,10 @@ print(p.diagnosis_.to_dataframe())  # 导出为表格
 
 ## 诊断规则详解
 
-全部规则按 4 层组织，基准参考行业指标（Siddiqi 2006, SR 11-7）。
+全部规则按 4 层组织，基准参考行业指标：
+- Siddiqi, *Credit Risk Scorecards* (2006)（评分卡开发与验证行业标准）
+- SR 11-7, *Model Risk Management Guidance*（美联储模型风险管理指引）
+- 银保监《商业银行资本计量高级方法验证指引》
 
 ### 第一层：区分力
 
